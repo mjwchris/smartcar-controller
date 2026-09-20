@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI 스마트카 음성 제어 & 음성 대화</title>
+  <title>360 서보 스마트카 초고속 제어</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -14,61 +14,29 @@
     }
     .container {
       width: 100%; max-width: 500px; background: #1e293b;
-      border-radius: 16px; padding: 24px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-      display: flex; flex-direction: column; gap: 16px;
+      border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 16px;
     }
     h1 { font-size: 1.4rem; text-align: center; color: #38bdf8; }
-    
-    .api-key-group {
-      display: flex; flex-direction: column; gap: 6px;
-      background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #334155;
-    }
-    .api-key-group label { font-size: 0.85rem; color: #94a3b8; font-weight: bold; }
-    .api-input-wrap { display: flex; gap: 8px; }
-    .api-key-group input {
-      flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #475569;
-      background: #1e293b; color: #fff; font-size: 0.9rem;
-    }
-    .btn-save-key {
-      padding: 10px 14px; background: #3b82f6; color: white; border: none;
-      border-radius: 6px; font-weight: bold; cursor: pointer; white-space: nowrap;
-    }
-
     .status-bar {
       display: flex; justify-content: space-between; align-items: center;
-      background: #0f172a; padding: 12px 16px; border-radius: 8px;
-      border: 1px solid #334155; font-size: 0.95rem;
+      background: #0f172a; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155;
     }
-    .status-dot {
-      display: inline-block; width: 10px; height: 10px;
-      border-radius: 50%; background-color: #ef4444; margin-right: 6px;
-    }
+    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #ef4444; margin-right: 6px; }
     .status-dot.connected { background-color: #22c55e; }
-
-    button.control-btn {
-      padding: 14px; border: none; border-radius: 8px;
-      font-size: 1rem; font-weight: bold; cursor: pointer;
-      transition: all 0.2s ease; width: 100%;
+    button {
+      padding: 14px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%;
     }
     .btn-ble { background-color: #0284c7; color: white; }
-    
     .btn-mic { background-color: #16a34a; color: white; }
     .btn-mic.listening { background-color: #ef4444; animation: pulse 1.5s infinite; }
-    
-    @keyframes pulse {
-      0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; }
-    }
-
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     .log-box {
       height: 260px; background: #0f172a; border: 1px solid #334155;
-      border-radius: 8px; padding: 12px; overflow-y: auto;
-      display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;
+      border-radius: 8px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;
     }
-    .msg { padding: 8px 12px; border-radius: 6px; line-height: 1.4; }
+    .msg { padding: 8px 12px; border-radius: 6px; }
     .msg.sys { background: #334155; color: #94a3b8; }
     .msg.user { background: #0369a1; color: #ffffff; align-self: flex-end; }
-    .msg.ai { background: #15803d; color: #ffffff; align-self: flex-start; }
     .msg.ble { background: #854d0e; color: #fef08a; }
     .msg.err { background: #991b1b; color: #fca5a5; }
   </style>
@@ -76,96 +44,59 @@
 <body>
 
   <div class="container">
-    <h1>🚗 AI 스마트카 음성 제어 & 음성 대화</h1>
-
-    <!-- Gemini API 키 입력 창 -->
-    <div class="api-key-group">
-      <label for="apiKeyInput">Gemini API Key</label>
-      <div class="api-input-wrap">
-        <input type="password" id="apiKeyInput" placeholder="Gemini API 키를 입력하세요">
-        <button class="btn-save-key" onclick="saveApiKey()">저장</button>
-      </div>
-    </div>
+    <h1>🚗 360 서보 초고속 음성 조종기</h1>
 
     <div class="status-bar">
       <span>HM-10 BLE:</span>
       <span><span id="bleDot" class="status-dot"></span><span id="bleText">미연결</span></span>
     </div>
 
-    <button class="control-btn btn-ble" onclick="connectBLE()">1. 블루투스 연결 (HM-10)</button>
-    <button id="micBtn" class="control-btn btn-mic" onclick="toggleSpeech()">2. 연속 음성 인식 시작</button>
+    <button class="btn-ble" onclick="connectBLE()">1. 블루투스 연결 (HM-10)</button>
+    <button id="micBtn" class="btn-mic" onclick="toggleSpeech()">2. 연속 음성 인식 ON/OFF</button>
 
     <div id="logBox" class="log-box">
-      <div class="msg sys">API 키를 저장하고 블루투스를 연결한 후 음성 인식을 켜세요.</div>
+      <div class="msg sys">블루투스를 연결한 후 음성 인식을 켜세요.</div>
     </div>
   </div>
 
   <script>
-    const MODEL_NAME = "gemini-3.6-flash";
     const BLE_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
     const BLE_CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
 
     let bleDevice = null;
     let bleCharacteristic = null;
     let recognition = null;
-    let isListening = false;
-    let keepListening = false; // 계속 마이크를 켜두는 플래그
+    let keepListening = false;
 
-    window.onload = () => {
-      const savedKey = localStorage.getItem('GEMINI_API_KEY');
-      if (savedKey) {
-        document.getElementById('apiKeyInput').value = savedKey;
-        logMsg('sys', '저장된 Gemini API 키를 불러왔습니다.');
-      }
-    };
-
-    function saveApiKey() {
-      const key = document.getElementById('apiKeyInput').value.trim();
-      if (!key) {
-        alert('API 키를 입력해주세요.');
-        return;
-      }
-      localStorage.setItem('GEMINI_API_KEY', key);
-      logMsg('sys', '✅ API 키가 저장되었습니다.');
-    }
-
-    function getApiKey() {
-      return localStorage.getItem('GEMINI_API_KEY') || document.getElementById('apiKeyInput').value.trim();
-    }
-
-    // Web Bluetooth API
     async function connectBLE() {
       try {
-        logMsg('sys', '블루투스 장치 검색 중...');
+        logMsg('sys', 'HM-10 검색 중...');
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ namePrefix: 'HM' }, { namePrefix: 'BT' }, { namePrefix: 'Smart' }],
           optionalServices: [BLE_SERVICE_UUID]
         });
-
         bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-
         const server = await bleDevice.gatt.connect();
         const service = await server.getPrimaryService(BLE_SERVICE_UUID);
         bleCharacteristic = await service.getCharacteristic(BLE_CHARACTERISTIC_UUID);
 
         document.getElementById('bleDot').classList.add('connected');
         document.getElementById('bleText').textContent = '연결됨';
-        logMsg('sys', '✅ HM-10 블루투스 연결 완료!');
+        logMsg('sys', '✅ HM-10 연결 완료!');
       } catch (error) {
-        logMsg('err', '❌ 블루투스 연결 실패: ' + error.message);
+        logMsg('err', '❌ 연결 실패: ' + error.message);
       }
     }
 
     function onDisconnected() {
       document.getElementById('bleDot').classList.remove('connected');
       document.getElementById('bleText').textContent = '미연결';
-      logMsg('err', '⚠️ 블루투스 연결이 끊어졌습니다.');
       bleCharacteristic = null;
     }
 
     async function sendBLECommand(command) {
       if (!bleCharacteristic) {
-        logMsg('sys', `[시뮬레이션 모드] 신호 전송: '${command}'`);
+        logMsg('sys', `[시뮬레이션] 송신: ${command}`);
         return;
       }
       try {
@@ -173,75 +104,56 @@
         await bleCharacteristic.writeValue(encoder.encode(command + "\n"));
         logMsg('ble', `📡 HM-10 송신: [ ${command} ]`);
       } catch (error) {
-        logMsg('err', 'BLE 전송 실패: ' + error.message);
+        logMsg('err', 'BLE 송신 에러: ' + error.message);
       }
     }
 
-    // TTS (음성 대화 답변 읽기)
-    function speakText(text) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel(); // 이전 음성 중단
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ko-KR';
-        utterance.rate = 1.0;
-        window.speechSynthesis.speak(utterance);
-      }
-    }
-
-    // Web Speech API (연속 음성 듣기 설정)
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        logMsg('err', '❌ 이 브라우저는 Web Speech API를 지원하지 않습니다. Chrome을 사용해 주세요.');
-        return null;
-      }
+      if (!SpeechRecognition) return null;
 
       const rec = new SpeechRecognition();
       rec.lang = 'ko-KR';
-      rec.continuous = true; // 계속 음성 인식 진행
+      rec.continuous = true;
       rec.interimResults = false;
 
       rec.onstart = () => {
-        isListening = true;
-        const btn = document.getElementById('micBtn');
-        btn.textContent = '🎙️ 음성 듣는 중... (클릭 시 종료)';
-        btn.classList.add('listening');
+        document.getElementById('micBtn').textContent = '🎙️ 음성 듣는 중... (클릭 시 끎)';
+        document.getElementById('micBtn').classList.add('listening');
       };
 
-      rec.onresult = async (event) => {
+      rec.onresult = (event) => {
         const lastIndex = event.results.length - 1;
-        const transcript = event.results[lastIndex][0].transcript.trim();
-        if (transcript) {
-          logMsg('user', `🗣️ 사용자: "${transcript}"`);
-          await parseCommandAndChatWithGemini(transcript);
-        }
-      };
-
-      rec.onerror = (e) => {
-        if (e.error !== 'no-speech') {
-          logMsg('err', '음성 인식 에러: ' + e.error);
-        }
+        const text = event.results[lastIndex][0].transcript.trim();
+        logMsg('user', `🗣️ "${text}"`);
+        
+        // 서버 요청 없이 브라우저에서 0.1초 즉시 판단
+        fastLocalParse(text);
       };
 
       rec.onend = () => {
-        // 사용자가 직접 끄지 않았다면 자동으로 마이크 재시작
-        if (keepListening) {
-          try { rec.start(); } catch (e) {}
-        } else {
-          stopSpeechUI();
-        }
+        if (keepListening) { try { rec.start(); } catch(e){} }
+        else { stopSpeechUI(); }
       };
 
       return rec;
     }
 
-    function toggleSpeech() {
-      const apiKey = getApiKey();
-      if (!apiKey) {
-        alert("Gemini API 키를 먼저 입력하고 저장 버튼을 누르세요!");
-        return;
+    function fastLocalParse(text) {
+      if (text.includes("앞") || text.includes("전진") || text.includes("출발") || text.includes("가자")) {
+        sendBLECommand("FORWARD");
+      } else if (text.includes("뒤") || text.includes("후진") || text.includes("빠져")) {
+        sendBLECommand("BACK");
+      } else if (text.includes("왼") || text.includes("좌")) {
+        sendBLECommand("LEFT");
+      } else if (text.includes("오른") || text.includes("우")) {
+        sendBLECommand("RIGHT");
+      } else if (text.includes("멈") || text.includes("정지") || text.includes("서")) {
+        sendBLECommand("STOP");
       }
+    }
 
+    function toggleSpeech() {
       if (!recognition) recognition = initSpeechRecognition();
       if (!recognition) return;
 
@@ -249,7 +161,6 @@
         keepListening = false;
         recognition.stop();
         stopSpeechUI();
-        logMsg('sys', '⏹️ 음성 인식을 정지했습니다.');
       } else {
         keepListening = true;
         try { recognition.start(); } catch (e) {}
@@ -257,81 +168,9 @@
     }
 
     function stopSpeechUI() {
-      isListening = false;
       const btn = document.getElementById('micBtn');
-      btn.textContent = '2. 연속 음성 인식 시작';
+      btn.textContent = '2. 연속 음성 인식 ON/OFF';
       btn.classList.remove('listening');
-    }
-
-    // Gemini REST API (제어 명령 + 대화형 답변 분리 파싱)
-    async function parseCommandAndChatWithGemini(userPrompt) {
-      const apiKey = getApiKey();
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
-
-      logMsg('sys', 'Gemini AI 생각 중...');
-
-      const payload = {
-        contents: [{ parts: [{ text: userPrompt }] }],
-        systemInstruction: {
-          parts: [{
-            text: `너는 친절하고 재미있는 AI 스마트카야. 
-사용자의 말을 듣고 다음 두 요소를 '|' 문자로 구분해서 한 줄로 대답해줘:
-[명령어]|[사용자에게 할 대화 답변]
-
-1. 명령어 구분:
-- 전진/앞으로/출발 -> FORWARD
-- 후진/뒤로/후퇴 -> BACK
-- 좌회전/왼쪽 -> LEFT
-- 우회전/오른쪽 -> RIGHT
-- 정지/멈춰/서 -> STOP
-- 이동 명령이 아닌 일반 대화 -> NONE
-
-2. 대화 답변:
-스마트카의 관점에서 1~2문장으로 짧고 다정하게 한국어로 말해줘.
-
-예시:
-"앞으로 가줘" -> FORWARD|네, 앞으로 힘차게 출발합니다!
-"너 이름이 뭐야?" -> NONE|저는 당신의 AI 스마트카예요.
-"오른쪽으로 돌아서 멈춰" -> RIGHT|오른쪽으로 회전할게요.`
-          }]
-        }
-      };
-
-      try {
-        const response = await fetch(apiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          logMsg('err', '❌ API 오류: ' + data.error.message);
-          return;
-        }
-
-        if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content) {
-          logMsg('err', '⚠️ AI 응답 없음');
-          return;
-        }
-
-        const rawText = data.candidates[0].content.parts[0].text.trim();
-        const parts = rawText.split('|');
-        
-        const command = parts[0] ? parts[0].trim() : "NONE";
-        const reply = parts[1] ? parts[1].trim() : rawText;
-
-        logMsg('ai', `🤖 AI 대답: "${reply}"`);
-        speakText(reply); // 음성 대화 출력
-
-        if (command !== "NONE") {
-          sendBLECommand(command);
-        }
-
-      } catch (error) {
-        logMsg('err', 'AI 처리 실패: ' + error.message);
-      }
     }
 
     function logMsg(type, text) {
