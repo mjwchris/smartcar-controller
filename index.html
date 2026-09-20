@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI 스마트카 음성 제어</title>
+  <title>AI 스마트카 음성 제어 & 음성 대화</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -61,7 +61,7 @@
     }
 
     .log-box {
-      height: 240px; background: #0f172a; border: 1px solid #334155;
+      height: 260px; background: #0f172a; border: 1px solid #334155;
       border-radius: 8px; padding: 12px; overflow-y: auto;
       display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;
     }
@@ -76,9 +76,9 @@
 <body>
 
   <div class="container">
-    <h1>🚗 AI 스마트카 웹 조종기</h1>
+    <h1>🚗 AI 스마트카 음성 제어 & 음성 대화</h1>
 
-    <!-- 🔑 Gemini API 키 입력 창 -->
+    <!-- Gemini API 키 입력 창 -->
     <div class="api-key-group">
       <label for="apiKeyInput">Gemini API Key</label>
       <div class="api-input-wrap">
@@ -93,10 +93,10 @@
     </div>
 
     <button class="control-btn btn-ble" onclick="connectBLE()">1. 블루투스 연결 (HM-10)</button>
-    <button id="micBtn" class="control-btn btn-mic" onclick="toggleSpeech()">2. 음성 명령 시작 (마이크)</button>
+    <button id="micBtn" class="control-btn btn-mic" onclick="toggleSpeech()">2. 연속 음성 인식 시작</button>
 
     <div id="logBox" class="log-box">
-      <div class="msg sys">API 키를 저장하고 블루투스를 연결한 후 음성 명령을 시작하세요.</div>
+      <div class="msg sys">API 키를 저장하고 블루투스를 연결한 후 음성 인식을 켜세요.</div>
     </div>
   </div>
 
@@ -109,8 +109,8 @@
     let bleCharacteristic = null;
     let recognition = null;
     let isListening = false;
+    let keepListening = false; // 계속 마이크를 켜두는 플래그
 
-    // 페이지 로드시 자동 입력
     window.onload = () => {
       const savedKey = localStorage.getItem('GEMINI_API_KEY');
       if (savedKey) {
@@ -126,7 +126,7 @@
         return;
       }
       localStorage.setItem('GEMINI_API_KEY', key);
-      logMsg('sys', '✅ API 키가 브라우저에 저장되었습니다.');
+      logMsg('sys', '✅ API 키가 저장되었습니다.');
     }
 
     function getApiKey() {
@@ -177,7 +177,18 @@
       }
     }
 
-    // Web Speech API
+    // TTS (음성 대화 답변 읽기)
+    function speakText(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); // 이전 음성 중단
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ko-KR';
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    // Web Speech API (연속 음성 듣기 설정)
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -187,69 +198,101 @@
 
       const rec = new SpeechRecognition();
       rec.lang = 'ko-KR';
-      rec.continuous = false;
+      rec.continuous = true; // 계속 음성 인식 진행
+      rec.interimResults = false;
 
       rec.onstart = () => {
         isListening = true;
         const btn = document.getElementById('micBtn');
-        btn.textContent = '🎙️ 듣고 있습니다... (말씀하세요)';
+        btn.textContent = '🎙️ 음성 듣는 중... (클릭 시 종료)';
         btn.classList.add('listening');
       };
 
       rec.onresult = async (event) => {
-        const transcript = event.results[0][0].transcript;
-        logMsg('user', `🗣️ 음성: "${transcript}"`);
-        await parseCommandWithGemini(transcript);
+        const lastIndex = event.results.length - 1;
+        const transcript = event.results[lastIndex][0].transcript.trim();
+        if (transcript) {
+          logMsg('user', `🗣️ 사용자: "${transcript}"`);
+          await parseCommandAndChatWithGemini(transcript);
+        }
       };
 
       rec.onerror = (e) => {
-        logMsg('err', '음성 인식 에러: ' + e.error);
-        stopSpeech();
+        if (e.error !== 'no-speech') {
+          logMsg('err', '음성 인식 에러: ' + e.error);
+        }
       };
 
-      rec.onend = () => stopSpeech();
+      rec.onend = () => {
+        // 사용자가 직접 끄지 않았다면 자동으로 마이크 재시작
+        if (keepListening) {
+          try { rec.start(); } catch (e) {}
+        } else {
+          stopSpeechUI();
+        }
+      };
+
       return rec;
     }
 
     function toggleSpeech() {
       const apiKey = getApiKey();
       if (!apiKey) {
-        alert("화면 상단에 Gemini API 키를 먼저 입력하고 저장 버튼을 눌러주세요!");
+        alert("Gemini API 키를 먼저 입력하고 저장 버튼을 누르세요!");
         return;
       }
 
       if (!recognition) recognition = initSpeechRecognition();
       if (!recognition) return;
 
-      if (isListening) recognition.stop();
-      else recognition.start();
+      if (keepListening) {
+        keepListening = false;
+        recognition.stop();
+        stopSpeechUI();
+        logMsg('sys', '⏹️ 음성 인식을 정지했습니다.');
+      } else {
+        keepListening = true;
+        try { recognition.start(); } catch (e) {}
+      }
     }
 
-    function stopSpeech() {
+    function stopSpeechUI() {
       isListening = false;
       const btn = document.getElementById('micBtn');
-      btn.textContent = '2. 음성 명령 시작 (마이크)';
+      btn.textContent = '2. 연속 음성 인식 시작';
       btn.classList.remove('listening');
     }
 
-    // Gemini REST API (gemini-3.6-flash)
-    async function parseCommandWithGemini(userPrompt) {
+    // Gemini REST API (제어 명령 + 대화형 답변 분리 파싱)
+    async function parseCommandAndChatWithGemini(userPrompt) {
       const apiKey = getApiKey();
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
 
-      logMsg('sys', 'Gemini AI 명령 해석 중...');
+      logMsg('sys', 'Gemini AI 생각 중...');
 
       const payload = {
         contents: [{ parts: [{ text: userPrompt }] }],
         systemInstruction: {
           parts: [{
-            text: `너는 스마트카 제어 AI야. 사용자의 음성 명령을 해석해서 오직 다음 5가지 단어 중 하나만 대문자로 출력해.
-            - 전진, 앞으로, 출발 -> FORWARD
-            - 후진, 뒤로, 후퇴 -> BACK
-            - 좌회전, 왼쪽 -> LEFT
-            - 우회전, 오른쪽 -> RIGHT
-            - 정지, 멈춰, 서 -> STOP
-            명령을 알 수 없는 경우 STOP으로 응답해. 설명이나 추가 단어 없이 오직 한 단어만 출력해.`
+            text: `너는 친절하고 재미있는 AI 스마트카야. 
+사용자의 말을 듣고 다음 두 요소를 '|' 문자로 구분해서 한 줄로 대답해줘:
+[명령어]|[사용자에게 할 대화 답변]
+
+1. 명령어 구분:
+- 전진/앞으로/출발 -> FORWARD
+- 후진/뒤로/후퇴 -> BACK
+- 좌회전/왼쪽 -> LEFT
+- 우회전/오른쪽 -> RIGHT
+- 정지/멈춰/서 -> STOP
+- 이동 명령이 아닌 일반 대화 -> NONE
+
+2. 대화 답변:
+스마트카의 관점에서 1~2문장으로 짧고 다정하게 한국어로 말해줘.
+
+예시:
+"앞으로 가줘" -> FORWARD|네, 앞으로 힘차게 출발합니다!
+"너 이름이 뭐야?" -> NONE|저는 당신의 AI 스마트카예요.
+"오른쪽으로 돌아서 멈춰" -> RIGHT|오른쪽으로 회전할게요.`
           }]
         }
       };
@@ -269,17 +312,25 @@
         }
 
         if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content) {
-          logMsg('err', '⚠️ AI가 명령을 응답하지 못했습니다.');
-          sendBLECommand("STOP");
+          logMsg('err', '⚠️ AI 응답 없음');
           return;
         }
 
-        const command = data.candidates[0].content.parts[0].text.trim();
-        logMsg('ai', `🤖 AI 판단: ${command}`);
-        sendBLECommand(command);
+        const rawText = data.candidates[0].content.parts[0].text.trim();
+        const parts = rawText.split('|');
+        
+        const command = parts[0] ? parts[0].trim() : "NONE";
+        const reply = parts[1] ? parts[1].trim() : rawText;
+
+        logMsg('ai', `🤖 AI 대답: "${reply}"`);
+        speakText(reply); // 음성 대화 출력
+
+        if (command !== "NONE") {
+          sendBLECommand(command);
+        }
 
       } catch (error) {
-        logMsg('err', 'AI 해석 실패: ' + error.message);
+        logMsg('err', 'AI 처리 실패: ' + error.message);
       }
     }
 
