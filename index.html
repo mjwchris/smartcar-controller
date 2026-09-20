@@ -20,6 +20,21 @@
     }
     h1 { font-size: 1.4rem; text-align: center; color: #38bdf8; }
     
+    .api-key-group {
+      display: flex; flex-direction: column; gap: 6px;
+      background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #334155;
+    }
+    .api-key-group label { font-size: 0.85rem; color: #94a3b8; font-weight: bold; }
+    .api-input-wrap { display: flex; gap: 8px; }
+    .api-key-group input {
+      flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #475569;
+      background: #1e293b; color: #fff; font-size: 0.9rem;
+    }
+    .btn-save-key {
+      padding: 10px 14px; background: #3b82f6; color: white; border: none;
+      border-radius: 6px; font-weight: bold; cursor: pointer; white-space: nowrap;
+    }
+
     .status-bar {
       display: flex; justify-content: space-between; align-items: center;
       background: #0f172a; padding: 12px 16px; border-radius: 8px;
@@ -31,15 +46,14 @@
     }
     .status-dot.connected { background-color: #22c55e; }
 
-    button {
+    button.control-btn {
       padding: 14px; border: none; border-radius: 8px;
       font-size: 1rem; font-weight: bold; cursor: pointer;
       transition: all 0.2s ease; width: 100%;
     }
-    .btn-ble { background-color: #3b82f6; color: white; }
-    .btn-ble:hover { background-color: #2563eb; }
+    .btn-ble { background-color: #0284c7; color: white; }
     
-    .btn-mic { background-color: #0284c7; color: white; }
+    .btn-mic { background-color: #16a34a; color: white; }
     .btn-mic.listening { background-color: #ef4444; animation: pulse 1.5s infinite; }
     
     @keyframes pulse {
@@ -47,7 +61,7 @@
     }
 
     .log-box {
-      height: 280px; background: #0f172a; border: 1px solid #334155;
+      height: 240px; background: #0f172a; border: 1px solid #334155;
       border-radius: 8px; padding: 12px; overflow-y: auto;
       display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;
     }
@@ -62,30 +76,32 @@
 <body>
 
   <div class="container">
-    <h1>🚗 AI 스마트카 블루투스 제어</h1>
+    <h1>🚗 AI 스마트카 웹 조종기</h1>
+
+    <!-- 🔑 Gemini API 키 입력 창 -->
+    <div class="api-key-group">
+      <label for="apiKeyInput">Gemini API Key</label>
+      <div class="api-input-wrap">
+        <input type="password" id="apiKeyInput" placeholder="Gemini API 키를 입력하세요">
+        <button class="btn-save-key" onclick="saveApiKey()">저장</button>
+      </div>
+    </div>
 
     <div class="status-bar">
       <span>HM-10 BLE:</span>
       <span><span id="bleDot" class="status-dot"></span><span id="bleText">미연결</span></span>
     </div>
 
-    <button class="btn-ble" onclick="connectBLE()">1. 블루투스 연결 (HM-10)</button>
-    <button id="micBtn" class="btn-mic" onclick="toggleSpeech()">2. 음성 명령 시작 (마이크)</button>
+    <button class="control-btn btn-ble" onclick="connectBLE()">1. 블루투스 연결 (HM-10)</button>
+    <button id="micBtn" class="control-btn btn-mic" onclick="toggleSpeech()">2. 음성 명령 시작 (마이크)</button>
 
     <div id="logBox" class="log-box">
-      <div class="msg sys">블루투스를 연결한 후 음성 명령을 시작하세요.</div>
+      <div class="msg sys">API 키를 저장하고 블루투스를 연결한 후 음성 명령을 시작하세요.</div>
     </div>
   </div>
 
   <script>
-    // ----------------------------------------------------
-    // [설정] 본인의 Google Gemini API 키를 입력하세요.
-    // ----------------------------------------------------
-    const API_KEY = "YOUR_GEMINI_API_KEY"; 
     const MODEL_NAME = "gemini-3.6-flash";
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
-
-    // HM-10 BLE 표준 서비스 및 특성 UUID
     const BLE_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
     const BLE_CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
 
@@ -94,7 +110,30 @@
     let recognition = null;
     let isListening = false;
 
-    // 1. Web Bluetooth API (HM-10 연결)
+    // 페이지 로드시 자동 입력
+    window.onload = () => {
+      const savedKey = localStorage.getItem('GEMINI_API_KEY');
+      if (savedKey) {
+        document.getElementById('apiKeyInput').value = savedKey;
+        logMsg('sys', '저장된 Gemini API 키를 불러왔습니다.');
+      }
+    };
+
+    function saveApiKey() {
+      const key = document.getElementById('apiKeyInput').value.trim();
+      if (!key) {
+        alert('API 키를 입력해주세요.');
+        return;
+      }
+      localStorage.setItem('GEMINI_API_KEY', key);
+      logMsg('sys', '✅ API 키가 브라우저에 저장되었습니다.');
+    }
+
+    function getApiKey() {
+      return localStorage.getItem('GEMINI_API_KEY') || document.getElementById('apiKeyInput').value.trim();
+    }
+
+    // Web Bluetooth API
     async function connectBLE() {
       try {
         logMsg('sys', '블루투스 장치 검색 중...');
@@ -124,10 +163,9 @@
       bleCharacteristic = null;
     }
 
-    // HM-10으로 데이터 전송
     async function sendBLECommand(command) {
       if (!bleCharacteristic) {
-        logMsg('sys', `[시뮬레이션 모드] 전송 신호: '${command}'`);
+        logMsg('sys', `[시뮬레이션 모드] 신호 전송: '${command}'`);
         return;
       }
       try {
@@ -139,7 +177,7 @@
       }
     }
 
-    // 2. Web Speech API (STT)
+    // Web Speech API
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -174,10 +212,12 @@
     }
 
     function toggleSpeech() {
-      if (!API_KEY || API_KEY === "YOUR_GEMINI_API_KEY") {
-        alert("코드 안의 API_KEY 변수에 Gemini API 키를 입력해 주세요!");
+      const apiKey = getApiKey();
+      if (!apiKey) {
+        alert("화면 상단에 Gemini API 키를 먼저 입력하고 저장 버튼을 눌러주세요!");
         return;
       }
+
       if (!recognition) recognition = initSpeechRecognition();
       if (!recognition) return;
 
@@ -192,8 +232,11 @@
       btn.classList.remove('listening');
     }
 
-    // 3. Gemini REST API (gemini-3.6-flash)
+    // Gemini REST API (gemini-3.6-flash)
     async function parseCommandWithGemini(userPrompt) {
+      const apiKey = getApiKey();
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
       logMsg('sys', 'Gemini AI 명령 해석 중...');
 
       const payload = {
@@ -212,7 +255,7 @@
       };
 
       try {
-        const response = await fetch(API_URL, {
+        const response = await fetch(apiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
@@ -233,7 +276,6 @@
 
         const command = data.candidates[0].content.parts[0].text.trim();
         logMsg('ai', `🤖 AI 판단: ${command}`);
-        
         sendBLECommand(command);
 
       } catch (error) {
