@@ -3,32 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> 음성 제어 스마트카</title>
+    <title>HM-10 음성 제어 스마트카</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 30px; }
-        button { padding: 15px 25px; font-size: 18px; margin: 10px; cursor: pointer; border-radius: 8px; }
-        #status { font-weight: bold; color: blue; margin: 15px; }
-        .control-btn { background-color: #e7e7e7; border: 1px solid #ccc; }
-        .stop-btn { background-color: #ff4d4d; color: white; border: none; }
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+        }
+
+        h2 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            color: #00e676;
+            text-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
+        }
+
+        #status {
+            font-size: 20px;
+            font-weight: 600;
+            color: #29b6f6;
+            margin: 25px 0;
+            padding: 15px 25px;
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            min-width: 280px;
+        }
+
+        .btn-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 320px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 16px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #262626;
+            border: 1px solid #444;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        button:hover {
+            background-color: #333333;
+            border-color: #00e676;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-connect {
+            border-color: #29b6f6;
+        }
+
+        .btn-voice {
+            border-color: #00e676;
+        }
     </style>
 </head>
 <body>
 
-    <h2>HM-10 스마트카 웹 조종기</h2>
-    <div id="status">상태: 연결 안 됨</div>
+    <h2>AI 음성 제어 스마트카</h2>
+    
+    <div id="status">상태: 블루투스 연결 필요</div>
 
-    <button onclick="connectBLE()">1. 블루투스(HM-10) 연결</button>
-    <button onclick="startVoice()">2. 음성 인식 시작</button>
-
-    <hr>
-
-    <h3>수동 조종 버튼</h3>
-    <div>
-        <button class="control-btn" onclick="sendCommand('FORWARD')">전진</button><br>
-        <button class="control-btn" onclick="sendCommand('LEFT')">좌회전</button>
-        <button class="stop-btn" onclick="sendCommand('STOP')">정지</button>
-        <button class="control-btn" onclick="sendCommand('RIGHT')">우회전</button><br>
-        <button class="control-btn" onclick="sendCommand('BACK')">후진</button>
+    <div class="btn-container">
+        <button class="btn-connect" onclick="connectBLE()">1. 블루투스(HM-10) 연결</button>
+        <button class="btn-voice" onclick="startVoice()">2. 연속 음성 인식 시작</button>
     </div>
 
     <script>
@@ -37,7 +97,7 @@
         let rxCharacteristic;
         let recognition;
 
-        // HM-10 BLE 연결 (서비스 및 특성 UUID)
+        // HM-10 BLE 연결
         async function connectBLE() {
             try {
                 document.getElementById('status').innerText = "상태: 기기 검색 중...";
@@ -51,20 +111,21 @@
                 rxCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
 
                 document.getElementById('status').innerText = "상태: 블루투스 연결 성공!";
+                document.getElementById('status').style.color = "#00e676";
             } catch (error) {
                 console.error(error);
-                document.getElementById('status').innerText = "상태: 연결 실패 - " + error;
+                document.getElementById('status').innerText = "상태: 연결 실패";
+                document.getElementById('status').style.color = "#ff5252";
             }
         }
 
-        // 명령어 전송 함수 (명령어 뒤에 반드시 \n 추가)
+        // 명령어 전송 (\n 포함)
         async function sendCommand(cmd) {
             if (!rxCharacteristic) {
                 alert("블루투스가 연결되지 않았습니다.");
                 return;
             }
             try {
-                // 아두이노 수신 처리를 위해 \n 개행문자 필수 전송
                 let encoder = new TextEncoder();
                 await rxCharacteristic.writeValue(encoder.encode(cmd + "\n"));
                 console.log("전송 명령:", cmd);
@@ -73,7 +134,7 @@
             }
         }
 
-        // 음성 인식 처리 (Chrome 권장)
+        // 음성 인식 시작 (Chrome 권장)
         function startVoice() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                 alert("이 브라우저는 음성 인식을 지원하지 않습니다. Chrome을 사용하세요.");
@@ -103,6 +164,7 @@
 
             recognition.start();
             document.getElementById('status').innerText = "상태: 음성 인식 시작됨 (말씀하세요)";
+            document.getElementById('status').style.color = "#29b6f6";
         }
     </script>
 </body>
